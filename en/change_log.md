@@ -1,3 +1,71 @@
+#### 0.12.1 2018-06-01
+
+**Features:**
+
+* \#149 Improve swagger importer
+
+**Bugs:**
+
+* \#172 Use default lang 'en' if set nonsupport lang in setting
+* \#192 Error while using request lib: cannot find module 'hawk'
+* \#189 Exception while using console.log to display object
+
+
+#### 0.12 2018-05-23
+
+**Features:**
+
+* \#119 Add tab function: close all, close all but actived, close all saved
+* \#147 Add Console tab for response to display request execution process information, it make debug script and variable earier
+* \#123 Add Pairwise algorithm for many to many of parameters to reduce case
+* \#174 Compress response
+* \#128 Add volumn for project lib & data for docker
+* \#133 Could get hitchhiker.request in Test script
+* \#121 More samples for new user
+
+**Bugs:**
+
+* \#152 fixed new uploaded project libs invalid for scheduler
+
+#### 0.11 2018-04-28
+
+**Features:**
+
+* \#158 Could use hkr instead of hitchhiker in script，(eg: hkr.setEnvVariable)
+* \#110 Could use getEnvVariable to get Environment variable in Common Pre Request Script
+* \#124 Display & edit & describe url's query string with key-value format
+* \#12  Display & edit & describe form data of body wit key-value format
+* \#122 Could beautify parameters
+* \#127 Improve Scheduler page ui
+
+**Bugs:**
+
+* \#132 Error while using [new Request from cUrl]
+* \#146 Chrome will hang if height of chrome's dev tool is high than hitchhiker's response panel
+* \#138 Parameters lenght display error
+* \#105 Scheduler style error when use filter in table
+
+
+#### 0.10 2018-03-13
+
+**Features:**
+
+* \#104 Multiple languages supported(chinese).
+* \#106 Auto add http:// to url if need
+* \#116 Convert form data to body while import datat from postman
+
+**Bugs:**
+
+* \#91 exception caused by form data included special symbol
+* \#103 improve email format verification
+
+#### 0.9 2018-01-29
+
+**Feature:**
+
+* Assert base on UI
+
+
 #### 0.8 2018-01-14
 
 **Features:**

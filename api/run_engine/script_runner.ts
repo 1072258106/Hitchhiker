@@ -15,24 +15,24 @@ const { NodeVM: safeVM } = require('vm2');
 export class ScriptRunner {
 
     static async prerequest(record: RecordEx): Promise<ResObject> {
-        const { pid, vid, uid, envId, envName, prescript } = record;
+        const { pid, vid, uid, envId, envName, envVariables, prescript } = record;
         let hitchhiker: Sandbox, res: ResObject;
         try {
-            hitchhiker = new Sandbox(pid, uid || vid, envId, envName, record);
+            hitchhiker = new Sandbox(pid, uid || vid, envId, envName, envVariables, record);
         } catch (ex) {
             res = { success: false, message: ex };
         }
 
-        res = await ScriptRunner.run({ hitchhiker, hh: hitchhiker, console: hitchhiker.console }, prescript);
+        res = await ScriptRunner.run({ hitchhiker, hh: hitchhiker, hkr: hitchhiker, console: hitchhiker.console }, prescript);
         res.result = { request: hitchhiker.request, consoleMsgQueue: hitchhiker.console.msgQueue };
         return res;
     }
 
-    static async test(record: RecordEx, res: request.RequestResponse): Promise<{ tests: _.Dictionary<boolean>, export: {}, consoleMsgQueue: Array<ConsoleMsg> }> {
-        const { pid, vid, uid, envId, envName, test } = record;
+    static async test(record: RecordEx, res: request.RequestResponse): Promise<{ tests: _.Dictionary<boolean>, export: {}, consoleMsgQueue: Array<ConsoleMsg>, error?: string }> {
+        const { pid, vid, uid, envId, envName, envVariables, test } = record;
         let hitchhiker, tests;
         try {
-            hitchhiker = new Sandbox(pid, uid || vid, envId, envName);
+            hitchhiker = new Sandbox(pid, uid || vid, envId, envName, envVariables, record);
         } catch (ex) {
             tests = {};
             tests[ex] = false;
@@ -44,14 +44,14 @@ export class ScriptRunner {
         const $variables$: any = hitchhiker.variables;
         const $export$ = hitchhiker.export;
 
-        const sandbox = { hitchhiker, hh: hitchhiker, $variables$, $export$, tests, console: hitchhiker.console, ...ScriptRunner.getInitResObj(res) };
+        const sandbox = { hitchhiker, hh: hitchhiker, hkr: hitchhiker, $variables$, $export$, tests, console: hitchhiker.console, ...ScriptRunner.getInitResObj(res) };
 
         const rst = await ScriptRunner.run(sandbox, test);
         if (!rst.success) {
             tests[rst.message] = false;
         }
         _.keys(tests).forEach(k => tests[k] = !!tests[k]);
-        return { tests, export: hitchhiker.exportObj.content, consoleMsgQueue: hitchhiker.console.msgQueue };
+        return { tests, export: hitchhiker.exportObj.content, consoleMsgQueue: hitchhiker.console.msgQueue, error: rst.success ? undefined : rst.message.toString() };
     }
 
     private static run(sandbox: any, code: string): Promise<ResObject> {

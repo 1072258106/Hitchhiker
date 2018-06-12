@@ -1,12 +1,12 @@
 import React from 'react';
 import { connect, Dispatch } from 'react-redux';
-import { Tabs, Badge, Radio, Select, Icon } from 'antd';
+import { Tabs, Badge, Radio, Select, Icon, Checkbox, Button, message } from 'antd';
 import RequestTabExtra from './request_tab_extra';
 import { normalBadgeStyle } from '../../../style/theme';
 import { DtoHeader } from '../../../../../api/interfaces/dto_header';
 import { actionCreator } from '../../../action/index';
 import { SelectReqTabType } from '../../../action/ui';
-import { KeyValueEditMode } from '../../../common/custom_type';
+import { KeyValueEditMode, DataMode } from '../../../common/custom_type';
 import { nameWithTag } from '../../../components/name_with_tag/index';
 import Editor from '../../../components/editor';
 import KeyValueList from '../../../components/key_value';
@@ -16,14 +16,19 @@ import { defaultBodyType, allParameter, noEnvironment } from '../../../common/co
 import { getActiveRecordSelector, getReqActiveTabKeySelector, getHeadersEditModeSelector, getActiveRecordStateSelector, getProjectEnvsSelector, getActiveEnvIdSelector } from './selector';
 import { DtoRecord } from '../../../../../api/interfaces/dto_record';
 import { RecordState, ParameterStatusState } from '../../../state/collection';
+import { KeyValueEditType } from '../../../common/custom_type';
 import { State } from '../../../state/index';
 import * as _ from 'lodash';
-import { ParameterType } from '../../../common/parameter_type';
+import { ParameterType, ReduceAlgorithmType } from '../../../common/parameter_type';
 import { StringUtil } from '../../../utils/string_util';
 import { RequestStatus } from '../../../common/request_status';
 import AssertJsonView from '../../../components/assert_json_view';
 import { DtoAssert } from '../../../../../api/interfaces/dto_assert';
 import { DtoEnvironment } from '../../../../../api/interfaces/dto_environment';
+import Msg from '../../../locales';
+import CopyToClipboard from 'react-copy-to-clipboard';
+import { DtoBodyFormData } from '../../../../../api/interfaces/dto_variable';
+import LocalesString from '../../../locales/string';
 
 const TabPane = Tabs.TabPane;
 const RadioGroup = Radio.Group;
@@ -37,7 +42,11 @@ interface RequestOptionPanelStateProps {
 
     headers?: DtoHeader[];
 
+    formDatas?: DtoBodyFormData[];
+
     body?: string;
+
+    bodyMode: DataMode;
 
     test?: string;
 
@@ -48,6 +57,8 @@ interface RequestOptionPanelStateProps {
     parameters?: string;
 
     parameterType: ParameterType;
+
+    reduceAlgorithm: ReduceAlgorithmType;
 
     assertInfos?: _.Dictionary<DtoAssert[]>;
 
@@ -111,19 +122,39 @@ class RequestOptionPanel extends React.Component<RequestOptionPanelProps, Reques
     private currentParam = (arr: any[]) => {
         const { currentParam } = this.props;
         const currParam = arr[Number.parseInt(currentParam)] ? currentParam : allParameter;
+        let paramStr = '';
+        if (currParam === allParameter) {
+            paramStr = arr.map(a => this.generateParamStr(a)).join('\n');
+        } else {
+            paramStr = this.generateParamStr(arr[Number.parseInt(currentParam)]);
+        }
         return (
-            <Select className="req-res-tabs-param-title-select" value={currParam} onChange={this.onCurrentParamChanged}>
-                <Option key={allParameter} value={allParameter}>allParameter</Option>
-                {
-                    arr.map((e, i) => (
-                        <Option key={i.toString()} value={i.toString()}>
-                            {this.getParamStatusIcon(StringUtil.toString(e))}
-                            {StringUtil.toString(e)}
-                        </Option>
-                    ))
-                }
-            </Select>
+            <span>
+                <Select className="req-res-tabs-param-title-select" dropdownMatchSelectWidth={false} value={currParam} onChange={this.onCurrentParamChanged}>
+                    <Option key={allParameter} value={allParameter}>{Msg('Collection.AllParameter')}</Option>
+                    {
+                        arr.map((e, i) => (
+                            <Option key={i.toString()} value={i.toString()}>
+                                {this.getParamStatusIcon(StringUtil.toString(e))}
+                                {StringUtil.toString(e)}
+                            </Option>
+                        ))
+                    }
+                </Select>
+                <CopyToClipboard text={paramStr} onCopy={() => message.success(LocalesString.get('Collection.ParamCopied'), 3)}>
+                    <Button
+                        className="req-copy-btn"
+                        style={{ marginLeft: 4 }}
+                        type="primary"
+                        icon="copy"
+                    />
+                </CopyToClipboard>
+            </span>
         );
+    }
+
+    private generateParamStr(param: any) {
+        return Object.keys(param).map(k => `"{{${k}}}"=="${param[k]}"`).join('&&');
     }
 
     private getParamStatusIcon = (param: string) => {
@@ -156,11 +187,16 @@ class RequestOptionPanel extends React.Component<RequestOptionPanelProps, Reques
         return { isResValid, obj };
     }
 
+    private onFormDataChanged = (data: DtoHeader[]) => {
+        data.forEach((v, i) => v.sort = i);
+        this.props.changeRecord({ formDatas: data });
+    }
+
     public render() {
 
-        const { activeTabKey, headers, body, parameters, parameterType, assertInfos, test, prescript, headersEditMode, favHeaders, envs, currentEnv } = this.props;
+        const { activeTabKey, headers, formDatas, body, parameters, parameterType, reduceAlgorithm, assertInfos, test, prescript, headersEditMode, favHeaders, envs, currentEnv, bodyMode } = this.props;
         const { isValid, msg } = StringUtil.verifyParameters(parameters || '', parameterType);
-        let paramArr = StringUtil.getUniqParamArr(parameters, parameterType);
+        let paramArr = StringUtil.getUniqParamArr(parameters, parameterType, reduceAlgorithm);
         const { isResValid, obj } = this.hasVaildResponseObj();
 
         return (
@@ -170,63 +206,102 @@ class RequestOptionPanel extends React.Component<RequestOptionPanelProps, Reques
                 activeKey={activeTabKey}
                 animated={false}
                 onChange={this.onTabChanged}
-                tabBarExtraContent={<RequestTabExtra />}>
-                <TabPane tab={nameWithTag('Headers', headers ? (Math.max(0, headers.length)).toString() : '')} key="headers">
+                tabBarExtraContent={<RequestTabExtra />}
+            >
+                <TabPane tab={nameWithTag(Msg('Collection.Headers'), headers ? (Math.max(0, headers.length)).toString() : '')} key="headers">
                     <KeyValueList
                         mode={headersEditMode}
                         onHeadersChanged={this.onHeadersChanged}
                         isAutoComplete={true}
                         headers={_.sortBy(_.cloneDeep(headers) || [], 'sort')}
-                        showFav={true}
+                        showFav={false}
+                        showDescription={true}
                         favHeaders={favHeaders}
                     />
                 </TabPane>
-                <TabPane tab={(
-                    <Badge style={normalBadgeStyle} dot={!!parameters && parameters.length > 0} count="" >
-                        Parameters
-                    </Badge>
-                )} key="parameters">
+                <TabPane
+                    tab={(
+                        <Badge style={normalBadgeStyle} dot={!!parameters && parameters.length > 0} count="" >
+                            {Msg('Collection.Parameters')}
+                        </Badge>
+                    )}
+                    key="parameters"
+                >
                     <span className="req-res-tabs-param-title">
                         <RadioGroup onChange={v => this.props.changeRecord({ 'parameterType': (v.target as any).value })} value={parameterType}>
                             <Radio value={ParameterType.ManyToMany}>{ParameterType[ParameterType.ManyToMany]}</Radio>
                             <Radio value={ParameterType.OneToOne}>{ParameterType[ParameterType.OneToOne]}</Radio>
                         </RadioGroup>
+                        <Checkbox
+                            checked={reduceAlgorithm === ReduceAlgorithmType.pairwise}
+                            onChange={e => this.props.changeRecord({ reduceAlgorithm: (e.target as any).checked ? ReduceAlgorithmType.pairwise : ReduceAlgorithmType.none })}
+                        >
+                            {Msg('Collection.ReduceAlgorithm')}
+                        </Checkbox>
                         <span>
-                            {isValid ? `${paramArr.length} requests: ` : msg}
+                            {isValid ? Msg('Collection.ParameterRequest', { length: paramArr.length }) : msg}
                             {isValid ? this.currentParam(paramArr) : ''}
                         </span>
                     </span>
                     <Editor type="json" fixHeight={true} height={258} value={parameters || ''} onChange={v => this.props.changeRecord({ 'parameters': v })} />
                 </TabPane>
-                <TabPane tab={(
-                    <Badge style={normalBadgeStyle} dot={!!body && body.length > 0} count="" >
-                        Body
-                    </Badge>
-                )} key="body">
-                    <Editor ref={ele => this.bodyEditor = ele} type={bodyTypes[this.currentBodyType()]} fixHeight={true} height={300} value={body} onChange={v => this.props.changeRecord({ 'body': v })} />
+                <TabPane
+                    tab={(
+                        <Badge style={normalBadgeStyle} dot={(!!body && body.length > 0) || (formDatas && formDatas.length > 0)} count="" >
+                            {Msg('Collection.Body')}
+                        </Badge>
+                    )}
+                    key="body"
+                >
+                    <RadioGroup style={{ marginBottom: 8 }} onChange={v => this.props.changeRecord({ 'dataMode': (v.target as any).value })} value={bodyMode}>
+                        <Radio value={DataMode.urlencoded}>x-www-form-urlencoded</Radio>
+                        <Radio value={DataMode.raw}>raw</Radio>
+                    </RadioGroup>
+                    {
+                        bodyMode === DataMode.raw ?
+                            <Editor ref={ele => this.bodyEditor = ele} type={bodyTypes[this.currentBodyType()]} fixHeight={true} height={300} value={body} onChange={v => this.props.changeRecord({ 'body': v })} /> :
+                            <KeyValueList
+                                mode={KeyValueEditType.keyValueEdit}
+                                onHeadersChanged={this.onFormDataChanged}
+                                isAutoComplete={false}
+                                headers={_.sortBy(_.cloneDeep(formDatas) || [], 'sort')}
+                                showFav={false}
+                                showDescription={true}
+                            />
+                    }
+
                 </TabPane>
-                <TabPane tab={(
-                    <Badge style={normalBadgeStyle} dot={!!prescript && prescript.length > 0} count="">
-                        Pre Request Script
-                    </Badge>
-                )} key="prescript">
+                <TabPane
+                    tab={(
+                        <Badge style={normalBadgeStyle} dot={!!prescript && prescript.length > 0} count="">
+                            {Msg('Collection.PreRequestScript')}
+                        </Badge>
+                    )}
+                    key="prescript"
+                >
                     <Editor type="javascript" height={300} fixHeight={true} value={prescript || ''} onChange={v => this.props.changeRecord({ 'prescript': v })} />
                 </TabPane>
-                <TabPane tab={(
-                    <Badge style={normalBadgeStyle} dot={!!test && test.length > 0} count="">
-                        Test
-                    </Badge>
-                )} key="test">
+                <TabPane
+                    tab={(
+                        <Badge style={normalBadgeStyle} dot={!!test && test.length > 0} count="">
+                            {Msg('Collection.Test')}
+                        </Badge>
+                    )}
+                    key="test"
+                >
                     <Editor type="javascript" height={300} fixHeight={true} value={test} onChange={v => this.props.changeRecord({ 'test': v })} />
                 </TabPane>
-                <TabPane tab={(
-                    <Badge style={normalBadgeStyle} dot={!!assertInfos && Object.keys(assertInfos).length > 0} count="">
-                        Assert base on UI
-                    </Badge>
-                )} key="assert">
+                <TabPane
+                    tab={(
+                        <Badge style={normalBadgeStyle} dot={!!assertInfos && Object.keys(assertInfos).length > 0} count="">
+                            {Msg('Collection.AssertBaseOnUI')}
+                        </Badge>
+                    )}
+                    key="assert"
+                >
                     {isResValid ?
                         <AssertJsonView height={300} envs={envs} currentEnv={currentEnv} data={obj} assertInfos={assertInfos || {}} onAssertInfosChanged={infos => this.props.changeRecord({ 'assertInfos': infos })} />
-                        : <div className="req-opt-assert-invalid">There is no valid response, please ensure response exist with json format.</div>
+                        : <div className="req-opt-assert-invalid">{Msg('Collection.NoValidResponseForAssert')}</div>
                     }
                 </TabPane>
             </Tabs>
@@ -238,7 +313,7 @@ function getRes(state: State) {
     const record = getActiveRecordSelector()(state);
     const recordState = getActiveRecordStateSelector()(state);
     const activeKey = state.displayRecordsState.activeKey;
-    const { currParam, paramArr } = StringUtil.parseParameters(record.parameters, record.parameterType, recordState.parameter);
+    const { currParam, paramArr } = StringUtil.parseParameters(record.parameters, record.parameterType, recordState.parameter, record.reduceAlgorithm);
     const currParamStr = JSON.stringify(currParam);
     const resState = state.displayRecordsState.responseState[activeKey];
     return !resState ? undefined : (paramArr.length === 0 ? resState['runResult'] : (currParam === allParameter ? resState : resState[currParamStr]));
@@ -269,12 +344,15 @@ const mapStateToProps = (state: State): RequestOptionPanelStateProps => {
         activeKey: state.displayRecordsState.activeKey,
         activeTabKey: getReqActiveTabKeySelector()(state),
         headers: record.headers,
+        formDatas: record.formDatas,
         body: record.body,
+        bodyMode: record.dataMode === undefined ? DataMode.raw : record.dataMode,
         test: record.test,
         prescript: record.prescript,
         bodyType: record.bodyType,
         parameters: record.parameters,
         parameterType: record.parameterType,
+        reduceAlgorithm: record.reduceAlgorithm || ReduceAlgorithmType.none,
         assertInfos: record.assertInfos,
         headersEditMode: getHeadersEditModeSelector()(state),
         currentParam: getActiveRecordStateSelector()(state).parameter,

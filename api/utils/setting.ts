@@ -22,7 +22,7 @@ export class Setting {
         files.forEach(file => {
             const filePath = path.join(frontEndJSFolder, file);
             let content = fs.readFileSync(filePath, 'utf8');
-            content = content.replace('HITCHHIKER_APP_HOST', this.appHost);
+            content = content.replace('HITCHHIKER_APP_HOST', this.appHost).replace(/hitchhiker_\w+?(?=")/g, `hitchhiker_${this.appLanguage}`);
             fs.writeFileSync(filePath, content, { encoding: 'utf8' });
         });
     }
@@ -77,6 +77,10 @@ export class Setting {
 
     get db() {
         return this._setting.db;
+    }
+
+    get encryptPassword() {
+        return this.getValidBoolean(process.env.HITCHHIKER_ENCRYPT_PASSWORD, this._setting.encryptPassword);
     }
 
     get scheduleDuration() {
@@ -207,6 +211,6 @@ export class Setting {
     }
 
     private getValidBoolean(envVar: any, spare: boolean) {
-        return envVar === undefined ? spare : (envVar === '1');
+        return envVar === undefined ? spare : (envVar === '1' || envVar === 'true');
     }
 }

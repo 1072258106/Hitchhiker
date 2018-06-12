@@ -13,17 +13,24 @@ import { User } from '../../models/user';
 import { CollectionService } from '../collection_service';
 import { ProjectService } from '../project_service';
 import { DtoCollection } from '../../interfaces/dto_collection';
+import { DtoBodyFormData } from '../../interfaces/dto_variable';
+import { DataMode } from '../../common/data_mode';
+import { Environment } from '../../models/environment';
+import { VariableService } from '../variable_service';
+import { EnvironmentService } from '../environment_service';
 
 export class SwaggerImport implements RequestsImport {
 
     baseUrl: string;
 
     async import(swaggerData: any, projectId: string, user: User): Promise<void> {
-        this.baseUrl = `${swaggerData.host}${swaggerData.basePath}`;
+        const env = this.createEnv(projectId, `${swaggerData.host}${swaggerData.basePath}`);
+        this.baseUrl = '{{host}}';
         let sort = await RecordService.getMaxSort();
         const dtoCollection: DtoCollection = {
             name: swaggerData.info.title,
             commonPreScript: '',
+            commonSetting: { prescript: '', test: '', headers: [] },
             projectId: projectId,
             id: StringUtil.generateUID(),
             description: swaggerData.info.description
@@ -37,6 +44,27 @@ export class SwaggerImport implements RequestsImport {
         await CollectionService.save(collection);
 
         await Promise.all(collection.records.map(r => RecordService.saveRecordHistory(RecordService.createRecordHistory(r, user))));
+
+        await EnvironmentService.save(env);
+    }
+
+    private createEnv(projectId: string, host: string): Environment {
+        const env = new Environment();
+        env.name = 'swagger env';
+        env.id = StringUtil.generateUID();
+        env.variables = [];
+        env.project = ProjectService.create(projectId);
+
+        const variable = VariableService.fromDto({
+            id: StringUtil.generateUID(),
+            key: 'host',
+            value: host,
+            isActive: true,
+            sort: 0
+        });
+        variable.environment = env;
+        env.variables.push(variable);
+        return env;
     }
 
     private createRecords(swaggerData: any, collectionId: string, sort: number): Record[] {
@@ -73,6 +101,7 @@ export class SwaggerImport implements RequestsImport {
     private createRecordsForFolder(path: string, methodDatas: any, schemes: any, folderId: string, collectionId: string, sort: number): Record[] {
         return _.keys(methodDatas).map(method => {
             const methodData = methodDatas[method];
+            const formData = this.parseFormData(methodData);
             return RecordService.fromDto({
                 id: StringUtil.generateUID(),
                 name: methodData.summary || methodData.operationId || '',
@@ -83,7 +112,8 @@ export class SwaggerImport implements RequestsImport {
                 url: this.parseUrl(path, methodData, schemes),
                 method: method.toUpperCase(),
                 headers: this.parseHeaders(methodData),
-                body: this.parseFormData(methodData),
+                formDatas: formData,
+                dataMode: formData.length > 0 ? DataMode.urlencoded : DataMode.raw,
                 sort: ++sort
             });
         });
@@ -91,7 +121,7 @@ export class SwaggerImport implements RequestsImport {
 
     private parseUrl(path: string, methodData: any, schemes: any): string {
         path = path.replace('{', ':').replace('}', '');
-        let url = `${schemes.length > 0 ? schemes[0] : 'http'}://${this.baseUrl}${path}`;
+        let url = `${(schemes || []).length > 0 ? schemes[0] : 'http'}://${this.baseUrl}${path}`;
 
         if (methodData.parameters) {
             methodData.parameters.filter(p => p.in === 'query').forEach(p => {
@@ -102,14 +132,14 @@ export class SwaggerImport implements RequestsImport {
         return url;
     }
 
-    private parseFormData(methodData: any): string {
-        let formDatas: string[] = [];
+    private parseFormData(methodData: any): DtoBodyFormData[] {
+        let formDatas: DtoBodyFormData[] = [];
         if (methodData.parameters) {
-            methodData.parameters.filter(p => p.in === 'formData').forEach(p => {
-                formDatas.push(`${p.name}={{${p.name}}}`);
+            methodData.parameters.filter(p => p.in === 'formData').forEach((p, i) => {
+                formDatas.push({ id: undefined, key: p.name, value: `{{${p.name}}`, description: p.description, isActive: true, sort: i });
             });
         }
-        return formDatas.join('&');
+        return formDatas;
     }
 
     private parseHeaders(methodData: any): Header[] {
@@ -123,7 +153,7 @@ export class SwaggerImport implements RequestsImport {
         }
         if (methodData.parameters) {
             methodData.parameters.filter(p => p.in === 'header').forEach((h, i) => {
-                headers.push({ key: h.name, value: `{{${h.name}}}`, isActive: true, sort: i + sort + 1 });
+                headers.push({ key: h.name, value: `{{${h.name}}}`, description: h.description, isActive: true, sort: i + sort + 1 });
             });
         }
         return headers.map(h => HeaderService.fromDto(h));

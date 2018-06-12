@@ -2,8 +2,10 @@ import { DtoHeader } from './dto_header';
 import { RecordCategory } from '../common/record_category';
 import { BodyType } from '../common/string_type';
 import { DtoUser } from './dto_user';
-import { ParameterType } from '../common/parameter_type';
+import { ParameterType, ReduceAlgorithmType } from '../common/parameter_type';
 import { DtoAssert } from './dto_assert';
+import { DtoQueryString, DtoBodyFormData } from './dto_variable';
+import { DataMode } from '../common/data_mode';
 
 export interface DtoRecord {
 
@@ -21,6 +23,10 @@ export interface DtoRecord {
 
     method?: string;
 
+    queryStrings?: DtoQueryString[];
+
+    formDatas?: DtoBodyFormData[];
+
     headers?: DtoHeader[];
 
     history?: DtoRecordHistory[];
@@ -31,7 +37,11 @@ export interface DtoRecord {
 
     bodyType?: BodyType;
 
+    dataMode?: DataMode;
+
     parameters?: string;
+
+    reduceAlgorithm?: ReduceAlgorithmType;
 
     parameterType: ParameterType;
 
@@ -40,6 +50,8 @@ export interface DtoRecord {
     test?: string;
 
     sort?: number;
+
+    description?: string;
 }
 
 export interface DtoRecordHistory {

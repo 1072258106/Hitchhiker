@@ -28,4 +28,13 @@ export class DateUtil {
     static subNowSec(date: Date): number {
         return (Date.now() - date.valueOf()) / 1000;
     }
+
+    static getDisplayTime(date: Date): string {
+        date = new Date(date);
+        return `${this.zeroPrefix(date.getHours())}:${this.zeroPrefix(date.getMinutes())}:${this.zeroPrefix(date.getSeconds())}.${this.zeroPrefix(date.getMilliseconds(), 3)}`;
+    }
+
+    private static zeroPrefix(n: number, count: number = 2) {
+        return `00${n}`.slice(0 - count);
+    }
 }

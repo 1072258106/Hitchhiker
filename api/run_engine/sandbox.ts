@@ -9,6 +9,7 @@ import { ProjectData } from '../interfaces/dto_project_data';
 import { ProjectFolderType } from '../common/string_type';
 import { Record } from '../models/record';
 import { ConsoleMsg } from '../interfaces/dto_res';
+import { StringUtil } from '../utils/string_util';
 
 class SandboxRequest {
 
@@ -18,6 +19,8 @@ class SandboxRequest {
 
     headers: _.Dictionary<string>;
 
+    formDatas: _.Dictionary<string>;
+
     body: string;
 }
 
@@ -26,7 +29,7 @@ class Console {
     msgQueue: Array<ConsoleMsg> = [];
 
     private write(type: string, msg: string) {
-        this.msgQueue.push({ type, message: msg });
+        this.msgQueue.push({ time: new Date(), type, message: msg, custom: true });
     }
 
     log(msg: string) {
@@ -62,18 +65,22 @@ export class Sandbox {
 
     exportObj = { content: Sandbox.defaultExport };
 
-    constructor(private projectId: string, private vid: string, private envId: string, private envName: string, record?: Record) {
+    constructor(private projectId: string, private vid: string, private envId: string, private envName: string, private envVariables: _.Dictionary<string>, record?: Record) {
         this.initVariables();
         this._allProjectJsFiles = ProjectDataService.instance.getProjectAllJSFiles(projectId);
         if (record) {
             this.request = {
-                url: record.url,
+                url: StringUtil.stringifyUrl(record.url, record.queryStrings),
                 method: record.method || 'GET',
                 body: record.body,
+                formDatas: {},
                 headers: {}
             };
             record.headers.filter(h => h.isActive).forEach(h => {
                 this.request.headers[h.key] = h.value;
+            });
+            record.formDatas.filter(h => h.isActive).forEach(f => {
+                this.request.formDatas[f.key] = f.value;
             });
         }
     }
@@ -88,7 +95,7 @@ export class Sandbox {
 
     require(lib: string) {
         if (Setting.instance.safeVM) {
-            throw new Error('not support [require] in SafeVM mode, you can set it to false if you want to use [require].');
+            throw new Error('not support [require] in SafeVM mode, you can set it to false in config file if you want to use [require].');
         }
         if (!this._allProjectJsFiles[lib]) {
             throw new Error(`no valid js lib named [${lib}], you should upload this lib first.`);
@@ -135,7 +142,7 @@ export class Sandbox {
     }
 
     getEnvVariable(key: string) {
-        return this.variables[key];
+        return this.variables[key] || this.envVariables[key];
     }
 
     removeEnvVariable(key: string) {

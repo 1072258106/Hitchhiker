@@ -1,3 +1,72 @@
+#### 0.12.1 2018-06-01
+
+**Features:**
+
+* \#149 改进对swagger的导入支持
+
+**Bugs:**
+
+* \#172 如果语言改错，默认使用en
+* \#192 使用request库时会提示cannot find module 'hawk'
+* \#189 在脚本里使用console.log时，如果输出的是对象会导致异常
+
+
+#### 0.12 2018-05-23
+
+**Features:**
+
+* \#119 增加几个批量关闭标签的功能（全部关闭，关闭保存，关闭当前标签外的所有）
+* \#147 response增加一个Console(日志)用于显示请求执行过程及脚本里调用的console，这样方便调试脚本和变量
+* \#123 对Parameters里的many to many增加算法选项：pairwise，用于减少用例
+* \#174 压缩请求返回的数据
+* \#128 对于docker，给global_data下面的project做持久化（破坏性改动，之前上传的在新版本需要再上传一次）
+* \#133 在Test里获取hitchhiker.request
+* \#121 给新用户增加更多例子
+
+**Bugs:**
+
+* \#152 修复上传的project libs对于自动化测试无效
+
+
+#### 0.11 2018-04-28
+
+**Features:**
+
+* \#158 脚本增加hitchhiker简称hkr，(hkr.setEnvVariable)
+* \#110 支持Common Pre Request Script里用getEnvVariable拿环境变量
+* \#124 以Key-value形式展示和编辑以及描述url的 Query 字符串
+* \#12  body里支持key-value形式展示和编辑以及描述form数据
+* \#122 parameters里面增加一个Beautify功能
+* \#127 Schedules 页面样式优化
+* 增加request描述编辑
+
+**Bugs:**
+
+* \#132 使用[new Request from cUrl]创建请求时，解析空字符串有点问题，会报错
+* \#146 当chrome的开发者工具，高度盖过“加载中”的动画时，chrome浏览器页面会卡死，无响应
+* \#138 parameters lenght显示错误
+* \#105 测试报告中过滤器会导致对比报告样式错乱
+
+
+#### 0.10 2018-03-13
+
+**Features:**
+
+* \#104 支持中文版.
+* \#106 如果需要，Url前自动加http://
+* \#116 导入postman时form转成body
+
+**Bugs:**
+
+* \#91 修复form data有特殊符号时的异常
+* \#103 改进email格式校验
+
+#### 0.9 2018-01-29
+
+**Feature:**
+
+* 基于UI的断言
+
 #### 0.8 2018-01-14
 
 **Features:**

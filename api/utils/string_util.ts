@@ -3,9 +3,10 @@ import { Setting } from './setting';
 import * as uuid from 'uuid';
 import * as shortId from 'shortid';
 import * as URL from 'url';
-import { ParameterType } from '../common/parameter_type';
+import { ParameterType, ReduceAlgorithmType } from '../common/parameter_type';
 import * as _ from 'lodash';
 import { DtoHeader } from '../interfaces/dto_header';
+import { PairwiseStrategy } from './pairwise';
 
 export class StringUtil {
 
@@ -13,6 +14,10 @@ export class StringUtil {
 
     static md5(str: string): string {
         return crypto.createHash('md5').update(str).digest('hex');
+    }
+
+    static md5Password(password: string): string {
+        return Setting.instance.encryptPassword ? this.md5(password) : password;
     }
 
     static encrypt(str: string): string {
@@ -105,6 +110,14 @@ export class StringUtil {
         }
     }
 
+    static tryAddHttpPrefix(url: string) {
+        const pattern = /^http[s]?:\/\//gi;
+        if (!pattern.test(url)) {
+            return `http://${url}`;
+        }
+        return url;
+    }
+
     static fixedEncodeURIComponent(url: string) {
         return encodeURIComponent(url).replace(/[!'()*]/g, c => {
             return '%' + c.charCodeAt(0).toString(16);
@@ -142,7 +155,7 @@ export class StringUtil {
         return { isValid: true, count, msg: `${count} requests: ` };
     }
 
-    static getParameterArr(paramObj: any, parameterType: ParameterType): Array<any> {
+    static getParameterArr(paramObj: any, parameterType: ParameterType, reduceAlgorithm: ReduceAlgorithmType): Array<any> {
         const paramArr = new Array<any>();
         if (parameterType === ParameterType.OneToOne) {
             Object.keys(paramObj).forEach((key, index) => {
@@ -151,6 +164,8 @@ export class StringUtil {
                     paramArr[i][key] = paramObj[key][i];
                 }
             });
+        } else if (reduceAlgorithm === ReduceAlgorithmType.pairwise) {
+            return PairwiseStrategy.GetTestCasesByObj(paramObj);
         } else {
             Object.keys(paramObj).forEach((key, index) => {
                 let temp = [...paramArr];
@@ -170,12 +185,12 @@ export class StringUtil {
         return paramArr;
     }
 
-    static parseParameters(parameters: string | undefined, parameterType: ParameterType): Array<any> {
+    static parseParameters(parameters: string | undefined, parameterType: ParameterType, reduceAlgorithm: ReduceAlgorithmType): Array<any> {
         if (!parameters) {
             return [];
         }
         const { isValid } = StringUtil.verifyParameters(parameters || '', parameterType);
-        let paramArr = isValid ? StringUtil.getParameterArr(JSON.parse(parameters || ''), parameterType) : new Array<any>();
+        let paramArr = isValid ? StringUtil.getParameterArr(JSON.parse(parameters || ''), parameterType, reduceAlgorithm) : new Array<any>();
         const paramDict = _.keyBy(paramArr, p => StringUtil.toString(p));
         return _.values(paramDict);
     }
@@ -200,5 +215,23 @@ export class StringUtil {
 
             return { isActive, key, value };
         });
+    }
+
+    static stringifyUrl(url: string, querys: DtoHeader[]) {
+        const arr = (url || '').split('?');
+
+        if (querys && querys.length) {
+            let queryString = '';
+            const activeQuerys = querys.filter(q => q.isActive && q.key != null);
+            activeQuerys.forEach((q, i) => {
+                queryString += `${q.key}${q.value != null ? '=' : ''}${q.value || ''}`;
+                if (i !== activeQuerys.length - 1) {
+                    queryString += '&';
+                }
+            });
+            return `${arr[0]}${queryString != null ? '?' : ''}${queryString}`;
+        }
+
+        return url;
     }
 }
